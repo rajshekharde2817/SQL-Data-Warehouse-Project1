@@ -1,10 +1,10 @@
 /*
-=============================================
-Creating database and Schemas
-=============================================
+=================================================
+Creating a database 'DataWarehouse1' and Schemas
+=================================================
 Script Purpose:
   This script is to create a new database called 'DataWarehouse1' after checking if it already exists.
-  If the database exists, the scripts drops it and recreates it. Additionally, the scripts sets up three schemas in 
+  If the database exists, the script drops it and recreates it. Additionally, the scripts sets up three schemas in 
   the database: 'bronze', 'silver' and 'gold'.
 
 Warning:
