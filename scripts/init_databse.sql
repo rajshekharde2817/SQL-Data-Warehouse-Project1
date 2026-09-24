@@ -8,7 +8,8 @@ Script Purpose:
   the database: 'bronze', 'silver' and 'gold'.
 
 Warning:
-  Running this script will drop the entire 'DataWarehouse1' database and recreates it. While droping all the existing data will be deleted.
+  Running this script will drop the entire database named 'DataWarehouse1' and recreates it. While droping all the existing data will be 
+  deleted.
   Please ensure you have proper backups of the data before running this script.
 */
 
