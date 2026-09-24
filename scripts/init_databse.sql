@@ -19,7 +19,7 @@ GO
 
 -- Dropping and recreating the database 'DataWarehouse1'
 IF EXISTS (Select 1 from sys.databases where name= 'DataWarehouse1')
-  Begin
+BEGIN
     ALTER Database DataWarehouse1 SET Single_User with Rollback Immediate;
     Drop database DataWarehouse1;
 END;
