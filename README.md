@@ -34,11 +34,11 @@
     These insights enable stakeholders with key business metrics for strategic decision making.
 
 ---------------------------------------------------
-   **License**
+   **License**:
     This project is licensed under the [MIT License], you are free to use, modify and share this project with proper attribution.
     
 ---------------------------------------------------
   
-   **About Me**
+   **About Me**:
     I am Raj Shekhar, a Data Engineering aspirant and working hard to get my hands very very dirty with data engineering projects, soon I      will take a leap into Data related projects. Meet you soon.
     
