@@ -26,12 +26,13 @@
 
    ***BI: Analytics and reporting(Data Analytics)***
    
-   **Objective**
-   -Develop SQL based analytics to deliver detailed insights into:
-    - **Customer Behavior**
-    - **Product Performance**
-    - **Sales Trends**
-    These insights enable stakeholders with key business metrics for strategic decision making.
+   **Objective**:
+   To Develop SQL based analytics to deliver detailed insights into:
+    **Customer Behavior**,
+    **Product Performance**,
+    **Sales Trends**
+
+These insights enable stakeholders with key business metrics for strategic decision making.
 
 ---------------------------------------------------
    **License**:
