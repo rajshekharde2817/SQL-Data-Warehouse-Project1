@@ -1,0 +1,417 @@
+/*
+===============================================================================
+Quality Checks - Silver Layer
+===============================================================================
+Script Purpose:
+    Performs data-quality checks across the Silver schema.
+
+    Checks include:
+      - NULL and duplicate business/primary keys
+      - Unwanted leading/trailing spaces
+      - Standardized values
+      - Invalid date ranges and date sequences
+      - Sales amount/quantity/price consistency
+      - Referential integrity between customers, products, and sales
+      - CRM/ERP key reconciliation
+
+Usage:
+    Run after executing the Silver load procedure.
+    Review every returned result set. These checks report anomalies; they do
+    not update or delete data.
+
+Notes:
+    1. Update table/column names if your Silver schema differs.
+    2. Some checks are warnings requiring business interpretation, not
+       automatic proof that a record is invalid.
+    3. Checks for sales arithmetic and product date ranges should follow the
+       approved business rules. Do not assume all negative sales are invalid.
+===============================================================================
+*/
+
+SET NOCOUNT ON;
+
+PRINT '===============================================================';
+PRINT 'SILVER LAYER DATA QUALITY CHECKS';
+PRINT '===============================================================';
+
+
+/*=============================================================================
+  1. CUSTOMER TABLE: silver.crm_cust_info
+=============================================================================*/
+
+PRINT '---------------------------------------------------------------';
+PRINT 'Checking silver.crm_cust_info';
+PRINT '---------------------------------------------------------------';
+
+-- 1.1 Check for NULL customer IDs
+-- Expectation: No results.
+SELECT *
+FROM silver.crm_cust_info
+WHERE cst_id IS NULL;
+
+-- 1.2 Check for duplicate customer IDs
+-- Expectation: No results.
+SELECT cst_id, COUNT(*) AS record_count
+FROM silver.crm_cust_info
+GROUP BY cst_id
+HAVING COUNT(*) > 1;
+
+-- 1.3 Check for NULL customer keys
+-- Expectation: No results, if cst_key is mandatory.
+SELECT *
+FROM silver.crm_cust_info
+WHERE cst_key IS NULL;
+
+-- 1.4 Check for duplicate customer keys
+-- Expectation: No results, if cst_key is unique by business definition.
+SELECT cst_key, COUNT(*) AS record_count
+FROM silver.crm_cust_info
+WHERE cst_key IS NOT NULL
+GROUP BY cst_key
+HAVING COUNT(*) > 1;
+
+-- 1.5 Check for leading/trailing spaces in names and key
+-- Expectation: No results.
+SELECT *
+FROM silver.crm_cust_info
+WHERE cst_key <> TRIM(cst_key)
+   OR cst_firstname <> TRIM(cst_firstname)
+   OR cst_lastname <> TRIM(cst_lastname);
+
+-- 1.6 Check standardized marital status
+-- Expectation: Values are Single, Married, or n/a under current procedure.
+SELECT *
+FROM silver.crm_cust_info
+WHERE cst_marital_status IS NULL
+   OR cst_marital_status NOT IN ('Single', 'Married', 'n/a');
+
+-- 1.7 Check standardized gender
+-- Expectation: Values are Female, Male, or n/a under current procedure.
+SELECT *
+FROM silver.crm_cust_info
+WHERE cst_gndr IS NULL
+   OR cst_gndr NOT IN ('Female', 'Male', 'n/a');
+
+-- 1.8 Check invalid customer creation dates
+-- Expectation: No results if dates must be populated and within an approved range.
+-- This check only detects NULL values; define date-range limits with the business.
+SELECT *
+FROM silver.crm_cust_info
+WHERE cst_create_date IS NULL;
+
+
+/*=============================================================================
+  2. PRODUCT TABLE: silver.crm_prd_info
+=============================================================================*/
+
+PRINT '---------------------------------------------------------------';
+PRINT 'Checking silver.crm_prd_info';
+PRINT '---------------------------------------------------------------';
+
+-- 2.1 Check for NULL product IDs
+-- Expectation: No results, if prd_id is mandatory.
+SELECT *
+FROM silver.crm_prd_info
+WHERE prd_id IS NULL;
+
+-- 2.2 Check for duplicate product IDs
+-- Expectation: No results, if prd_id is unique.
+SELECT prd_id, COUNT(*) AS record_count
+FROM silver.crm_prd_info
+GROUP BY prd_id
+HAVING COUNT(*) > 1;
+
+-- 2.3 Check for NULL product business keys
+-- Expectation: No results.
+SELECT *
+FROM silver.crm_prd_info
+WHERE prd_key IS NULL;
+
+-- 2.4 Check for duplicate product business keys
+-- Expectation: No results, if prd_key is unique in Silver.
+SELECT prd_key, COUNT(*) AS record_count
+FROM silver.crm_prd_info
+WHERE prd_key IS NOT NULL
+GROUP BY prd_key
+HAVING COUNT(*) > 1;
+
+-- 2.5 Check for leading/trailing spaces in product text
+-- Expectation: No results.
+SELECT *
+FROM silver.crm_prd_info
+WHERE prd_key <> TRIM(prd_key)
+   OR prd_nm <> TRIM(prd_nm)
+   OR prd_line <> TRIM(prd_line);
+
+-- 2.6 Check for negative product cost
+-- Expectation: No results unless negative costs are explicitly allowed.
+SELECT *
+FROM silver.crm_prd_info
+WHERE prd_cost < 0;
+
+-- 2.7 Check for standardized product lines
+-- Expectation: Values are Mountain, Road, Other Sales, Touring, or n/a.
+SELECT *
+FROM silver.crm_prd_info
+WHERE prd_line IS NULL
+   OR prd_line NOT IN ('Mountain', 'Road', 'Other Sales', 'Touring', 'n/a');
+
+-- 2.8 Check product date sequences
+-- Expectation: No rows where start date is later than end date.
+-- NULL end dates are allowed under the stated Silver business rule.
+SELECT *
+FROM silver.crm_prd_info
+WHERE prd_start_dt IS NOT NULL
+  AND prd_end_dt IS NOT NULL
+  AND prd_start_dt > prd_end_dt;
+
+-- 2.9 Check for NULL product start dates
+-- Expectation: Review any results according to the source/business rule.
+SELECT *
+FROM silver.crm_prd_info
+WHERE prd_start_dt IS NULL;
+
+
+/*=============================================================================
+  3. SALES TABLE: silver.crm_sales_details
+=============================================================================*/
+
+PRINT '---------------------------------------------------------------';
+PRINT 'Checking silver.crm_sales_details';
+PRINT '---------------------------------------------------------------';
+
+-- 3.1 Check for NULL order numbers
+-- Expectation: No results, if order number is mandatory.
+SELECT *
+FROM silver.crm_sales_details
+WHERE sls_ord_num IS NULL;
+
+-- 3.2 Check duplicate order numbers
+-- IMPORTANT:
+-- If one order can contain multiple product lines, sls_ord_num alone is not
+-- a unique key. Review duplicates instead of automatically treating them as
+-- invalid. Replace this with the approved transaction-grain key if available.
+SELECT sls_ord_num, COUNT(*) AS record_count
+FROM silver.crm_sales_details
+WHERE sls_ord_num IS NOT NULL
+GROUP BY sls_ord_num
+HAVING COUNT(*) > 1;
+
+-- 3.3 Check invalid/missing order dates
+-- Expectation: Review NULL order dates.
+SELECT *
+FROM silver.crm_sales_details
+WHERE sls_order_dt IS NULL;
+
+-- 3.4 Check shipment date before order date
+-- Expectation: No results, unless the business process permits this.
+SELECT *
+FROM silver.crm_sales_details
+WHERE sls_order_dt IS NOT NULL
+  AND sls_ship_dt IS NOT NULL
+  AND sls_ship_dt < sls_order_dt;
+
+-- 3.5 Check due date before order date
+-- Expectation: No results, unless the business process permits this.
+SELECT *
+FROM silver.crm_sales_details
+WHERE sls_order_dt IS NOT NULL
+  AND sls_due_dt IS NOT NULL
+  AND sls_due_dt < sls_order_dt;
+
+-- 3.6 Check negative quantity
+-- Expectation: Review; returns/credits may use negative quantities.
+SELECT *
+FROM silver.crm_sales_details
+WHERE sls_quantity < 0;
+
+-- 3.7 Check NULL prices
+-- Expectation: Review; NULL price may be allowed by the stated requirements.
+SELECT *
+FROM silver.crm_sales_details
+WHERE sls_price IS NULL;
+
+-- 3.8 Check sales arithmetic consistency
+-- Expectation: Review mismatches; do not overwrite source sales automatically.
+-- Negative sales may be legitimate. This check tests arithmetic only when
+-- quantity, price, and sales are populated.
+SELECT *
+FROM silver.crm_sales_details
+WHERE sls_quantity IS NOT NULL
+  AND sls_price IS NOT NULL
+  AND sls_sales IS NOT NULL
+  AND sls_sales <> sls_quantity * sls_price;
+
+-- 3.9 Check negative sales
+-- Informational check only: negative sales can represent returns or credits.
+SELECT *
+FROM silver.crm_sales_details
+WHERE sls_sales < 0;
+
+-- 3.10 Check zero quantity
+-- Informational check only: zero quantity may be permitted.
+SELECT *
+FROM silver.crm_sales_details
+WHERE sls_quantity = 0;
+
+
+/*=============================================================================
+  4. REFERENTIAL INTEGRITY: SALES -> PRODUCT/CUSTOMER
+=============================================================================*/
+
+PRINT '---------------------------------------------------------------';
+PRINT 'Checking sales references to customers and products';
+PRINT '---------------------------------------------------------------';
+
+-- 4.1 Sales with no matching Silver product
+-- Expectation: No results if all product keys must match.
+SELECT s.*
+FROM silver.crm_sales_details AS s
+LEFT JOIN silver.crm_prd_info AS p
+    ON s.sls_prd_key = p.prd_key
+WHERE s.sls_prd_key IS NOT NULL
+  AND p.prd_key IS NULL;
+
+-- 4.2 Sales with no matching Silver customer
+-- Expectation: No results if all customer IDs must match.
+SELECT s.*
+FROM silver.crm_sales_details AS s
+LEFT JOIN silver.crm_cust_info AS c
+    ON s.sls_cust_id = c.cst_id
+WHERE s.sls_cust_id IS NOT NULL
+  AND c.cst_id IS NULL;
+
+
+/*=============================================================================
+  5. ERP CUSTOMER QUALITY: silver.erp_cust_az12
+=============================================================================*/
+
+PRINT '---------------------------------------------------------------';
+PRINT 'Checking silver.erp_cust_az12';
+PRINT '---------------------------------------------------------------';
+
+-- 5.1 Check for NULL ERP customer IDs
+SELECT *
+FROM silver.erp_cust_az12
+WHERE CID IS NULL;
+
+-- 5.2 Check for duplicate ERP customer IDs
+SELECT CID, COUNT(*) AS record_count
+FROM silver.erp_cust_az12
+WHERE CID IS NOT NULL
+GROUP BY CID
+HAVING COUNT(*) > 1;
+
+-- 5.3 Check future birth dates
+-- Expectation: No results.
+SELECT *
+FROM silver.erp_cust_az12
+WHERE BDATE > CAST(GETDATE() AS DATE);
+
+-- 5.4 Check standardized ERP gender
+-- Expectation: Female, Male, or n/a under current procedure.
+SELECT *
+FROM silver.erp_cust_az12
+WHERE GEN IS NULL
+   OR GEN NOT IN ('Female', 'Male', 'n/a');
+
+
+/*=============================================================================
+  6. ERP LOCATION QUALITY: silver.erp_loc_a101
+=============================================================================*/
+
+PRINT '---------------------------------------------------------------';
+PRINT 'Checking silver.erp_loc_a101';
+PRINT '---------------------------------------------------------------';
+
+-- 6.1 Check for NULL ERP location/customer IDs
+SELECT *
+FROM silver.erp_loc_a101
+WHERE CID IS NULL;
+
+-- 6.2 Check duplicate ERP location/customer IDs
+-- Expectation depends on whether one location per customer is guaranteed.
+SELECT CID, COUNT(*) AS record_count
+FROM silver.erp_loc_a101
+WHERE CID IS NOT NULL
+GROUP BY CID
+HAVING COUNT(*) > 1;
+
+-- 6.3 Check blank or unstandardized country values
+-- Current procedure maps USA/US to 'Unitest States' and DE to ' Germany'.
+-- The misspelling/leading space are flagged here for review.
+SELECT *
+FROM silver.erp_loc_a101
+WHERE CNTRY IS NULL
+   OR CNTRY <> TRIM(CNTRY)
+   OR CNTRY = 'Unitest States'
+   OR CNTRY = 'n/a';
+
+
+/*=============================================================================
+  7. ERP PRODUCT CATEGORY QUALITY: silver.erp_px_cat_g1v2
+=============================================================================*/
+
+PRINT '---------------------------------------------------------------';
+PRINT 'Checking silver.erp_px_cat_g1v2';
+PRINT '---------------------------------------------------------------';
+
+-- 7.1 Check for NULL category IDs
+SELECT *
+FROM silver.erp_px_cat_g1v2
+WHERE ID IS NULL;
+
+-- 7.2 Check duplicate category/product IDs
+SELECT ID, COUNT(*) AS record_count
+FROM silver.erp_px_cat_g1v2
+WHERE ID IS NOT NULL
+GROUP BY ID
+HAVING COUNT(*) > 1;
+
+-- 7.3 Check for unwanted spaces in category attributes
+SELECT *
+FROM silver.erp_px_cat_g1v2
+WHERE CAT <> TRIM(CAT)
+   OR SUBCAT <> TRIM(SUBCAT)
+   OR MAINTENANCE <> TRIM(MAINTENANCE);
+
+
+/*=============================================================================
+  8. CROSS-SOURCE RECONCILIATION
+=============================================================================*/
+
+PRINT '---------------------------------------------------------------';
+PRINT 'Checking CRM/ERP key reconciliation';
+PRINT '---------------------------------------------------------------';
+
+-- 8.1 CRM customers without a matching ERP customer
+-- Uses the normalized key rule currently applied in the Silver ERP customer
+-- transformation. Review unmatched records; not every unmatched key is bad.
+SELECT c.cst_key
+FROM silver.crm_cust_info AS c
+LEFT JOIN silver.erp_cust_az12 AS e
+    ON c.cst_key = e.CID
+WHERE e.CID IS NULL;
+
+-- 8.2 ERP customers without a matching CRM customer
+-- Informational: ERP-only customers may be valid and are not necessarily errors.
+SELECT e.CID
+FROM silver.erp_cust_az12 AS e
+LEFT JOIN silver.crm_cust_info AS c
+    ON e.CID = c.cst_key
+WHERE c.cst_key IS NULL;
+
+-- 8.3 CRM product keys without matching ERP category records
+-- The category table may use a category/product identifier that differs from
+-- the CRM product key. Validate the actual mapping before treating results as
+-- failures. This check assumes the first five source key characters map to ID.
+SELECT p.prd_key, p.cat_id
+FROM silver.crm_prd_info AS p
+LEFT JOIN silver.erp_px_cat_g1v2 AS e
+    ON p.cat_id = e.ID
+WHERE e.ID IS NULL;
+
+PRINT '===============================================================';
+PRINT 'SILVER LAYER QUALITY CHECKS COMPLETED';
+PRINT 'Review each result set and investigate exceptions.';
+PRINT '===============================================================';
