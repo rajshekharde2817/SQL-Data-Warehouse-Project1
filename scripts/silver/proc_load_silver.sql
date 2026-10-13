@@ -341,9 +341,9 @@ BEGIN
 
             CASE
                 WHEN UPPER(TRIM(CNTRY)) IN ('USA', 'US')
-                    THEN 'Unitest States'
+                    THEN 'United States'
                 WHEN UPPER(TRIM(CNTRY)) = 'DE'
-                    THEN ' Germany'
+                    THEN 'Germany'
                 WHEN UPPER(TRIM(CNTRY)) = ' '
                   OR CNTRY IS NULL
                     THEN 'n/a'
